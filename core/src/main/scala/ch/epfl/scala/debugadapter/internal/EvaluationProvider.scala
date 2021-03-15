@@ -1,5 +1,6 @@
 package ch.epfl.scala.debugadapter.internal
 
+import ch.epfl.scala.debugadapter.internal.evaluator.Evaluator
 import com.microsoft.java.debug.core.IEvaluatableBreakpoint
 import com.microsoft.java.debug.core.adapter.IEvaluationProvider
 import com.sun.jdi.{DoubleValue, Field, FloatValue, LocalVariable, LongValue, Method, ObjectReference, PrimitiveValue, StackFrame, ThreadReference, Value, VirtualMachine}
@@ -20,11 +21,8 @@ object EvaluationProvider extends IEvaluationProvider {
       depth: Int
   ): CompletableFuture[Value] = {
     val frame = thread.frames().get(depth)
-    val result = expression.parse[Stat] match {
-      case Parsed.Success(tree) => evaluate(tree, frame, thread)
-      case Parsed.Error(_, msg, _) => Left(msg)
-    }
-    CompletableFuture.completedFuture(result.fold(error => thread.virtualMachine().mirrorOf(error), identity))
+    val objRef = frame.thisObject()
+    Evaluator.evaluate(expression, objRef, thread)
   }
 
   override def evaluate(
