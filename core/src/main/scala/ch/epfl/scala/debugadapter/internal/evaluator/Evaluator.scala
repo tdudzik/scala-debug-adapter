@@ -5,10 +5,16 @@ import com.sun.jdi.{ClassObjectReference, ObjectReference, ThreadReference, Valu
 
 import java.nio.file.{Files, Paths}
 import java.util.concurrent.CompletableFuture
+import scala.runtime.BoxesRunTime
 import scala.tools.nsc.Main
 
 object Evaluator {
   def evaluate(expression: String, objectReference: ObjectReference, thread: ThreadReference): CompletableFuture[Value] = {
+    println(for {
+      classLoader <- JdiClassLoader(objectReference, thread)
+      _ <- classLoader.loadClass("scala.runtime.BoxesRunTime")
+    } yield ())
+
     compileExpression(expression)
 
     val vm = thread.virtualMachine()

@@ -14,15 +14,17 @@ import scala.util.Try
 object EvaluationProvider extends IEvaluationProvider {
   override def isInEvaluation(thread: ThreadReference): Boolean = false
 
-  // Currently, only single expression is supported
   override def evaluate(
       expression: String,
       thread: ThreadReference,
       depth: Int
   ): CompletableFuture[Value] = {
     val frame = thread.frames().get(depth)
-    val objRef = frame.thisObject()
-    Evaluator.evaluate(expression, objRef, thread)
+    val result = expression.parse[Stat] match {
+      case Parsed.Success(tree) => evaluate(tree, frame, thread)
+      case Parsed.Error(_, msg, _) => Left(msg)
+    }
+    CompletableFuture.completedFuture(result.fold(error => thread.virtualMachine().mirrorOf(error), identity))
   }
 
   override def evaluate(
@@ -115,26 +117,27 @@ object EvaluationProvider extends IEvaluationProvider {
     case _ => Left("unsupported operation")
   }
 
-  private def evaluateOp(lhs: Value, rhs: Value, op: String, vm: VirtualMachine): Either[String, Value] = (lhs, rhs) match {
+  private def evaluateOp(lhs: Value, rhs: Value, opName: String, vm: VirtualMachine): Either[String, Value] = (lhs, rhs) match {
     case (x: PrimitiveValue, y: PrimitiveValue) => (x, y) match {
-        case (_: DoubleValue, _) | (_, _: DoubleValue) =>
-          evaluateFractionals(x.doubleValue(), y.doubleValue(), op).map(vm.mirrorOf)
-        case (_: FloatValue, _) | (_, _: FloatValue) =>
-          evaluateFractionals(x.floatValue(), y.floatValue(), op).map(vm.mirrorOf)
-        case (_: LongValue, _) | (_, _: LongValue) =>
-          evaluateIntegrals(x.longValue(), y.longValue(), op).map(vm.mirrorOf)
-        case (_, _) | (_, _) =>
-          evaluateIntegrals(x.intValue(), y.intValue(), op).map(vm.mirrorOf)
-        case _ => Left ("unsupported operation")
-      }
+      case (_: DoubleValue, _) | (_, _: DoubleValue) =>
+        evaluateFractionals(x.doubleValue(), y.doubleValue(), opName).map(vm.mirrorOf)
+      case (_: FloatValue, _) | (_, _: FloatValue) =>
+        evaluateFractionals(x.floatValue(), y.floatValue(), opName).map(vm.mirrorOf)
+      case (_: LongValue, _) | (_, _: LongValue) =>
+        evaluateIntegrals(x.longValue(), y.longValue(), opName).map(vm.mirrorOf)
+      case (_, _) | (_, _) =>
+        evaluateIntegrals(x.intValue(), y.intValue(), opName).map(vm.mirrorOf)
+      case _ => Left("unsupported operation")
+    }
+
     case _ => Left("unable to evaluate non-primitives")
   }
 
   private def evaluateIntegrals[T](
-      x: T,
-      y: T,
-      op: String
-  )(implicit integral: Integral[T]): Either[String, T] = op match {
+                                    x: T,
+                                    y: T,
+                                    op: String
+                                  )(implicit integral: Integral[T]): Either[String, T] = op match {
     case "+" => Right(integral.plus(x, y))
     case "-" => Right(integral.minus(x, y))
     case "*" => Right(integral.times(x, y))
@@ -143,10 +146,10 @@ object EvaluationProvider extends IEvaluationProvider {
   }
 
   private def evaluateFractionals[T](
-      x: T,
-      y: T,
-      op: String
-  )(implicit fractional: Fractional[T]): Either[String, T] = op match {
+                                      x: T,
+                                      y: T,
+                                      op: String
+                                    )(implicit fractional: Fractional[T]): Either[String, T] = op match {
     case "+" => Right(fractional.plus(x, y))
     case "-" => Right(fractional.minus(x, y))
     case "*" => Right(fractional.times(x, y))

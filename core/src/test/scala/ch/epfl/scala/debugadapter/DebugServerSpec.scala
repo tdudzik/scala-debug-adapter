@@ -40,7 +40,10 @@ object DebugServerSpec extends TestSuite {
         val stackTrace = client.stackTrace(threadId)
         val topFrame = stackTrace.stackFrames.head
 
-        println(client.evaluate("2 + 2 * 2", topFrame.id))
+        println(client.evaluate("c.add(d).value", topFrame.id))
+
+//        println(client.evaluate("2.+(2)", topFrame.id))
+//        println(client.evaluate("2 + 2 * 2", topFrame.id))
 //        assert(client.evaluate("2 + 2 * 2", topFrame.id) == "6")
 //        assert(client.evaluate("(2 + 2) * 2", topFrame.id) == "8")
 //        assert(client.evaluate("3.2 + 4.0", topFrame.id).toDouble == 7.2)
