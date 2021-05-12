@@ -9,14 +9,13 @@ import com.sun.jdi._
 import io.reactivex.Observable
 import org.objectweb.asm.{ClassReader, ClassVisitor, Label, MethodVisitor, Opcodes}
 
-import java.net.{URI, URL, URLClassLoader}
+import java.net.URI
 import java.nio.file.{Files, Path}
 import java.util
 import java.util.Collections
 import java.util.concurrent.CompletableFuture
 import java.util.function.Consumer
 import scala.collection.mutable
-import scala.tools.nsc.interactive.ExpressionCompiler
 import scala.util.control.NonFatal
 
 private[debugadapter] object DebugAdapter {
@@ -61,8 +60,7 @@ private[debugadapter] object DebugAdapter {
         depth: Int
     ): CompletableFuture[Value] = {
       val frame = thread.frames().get(depth)
-      val objRef = frame.thisObject()
-      Evaluator.evaluate(expression, objRef, thread)
+      Evaluator.evaluate(expression, thread, frame)
     }
 
     override def evaluate(
