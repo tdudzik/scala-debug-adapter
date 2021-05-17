@@ -1,5 +1,6 @@
 package ch.epfl.scala.debugadapter.internal
 
+import ch.epfl.scala.debugadapter.internal.evaluator.{Evaluator, JdiClassLoader}
 import ch.epfl.scala.debugadapter.{DebuggeeRunner, Logger}
 import com.microsoft.java.debug.core.{DebugSettings, IEvaluatableBreakpoint}
 import com.microsoft.java.debug.core.adapter._
@@ -57,7 +58,10 @@ private[debugadapter] object DebugAdapter {
         expression: String,
         thread: ThreadReference,
         depth: Int
-    ): CompletableFuture[Value] = ???
+    ): CompletableFuture[Value] = {
+      val frame = thread.frames().get(depth)
+      Evaluator.evaluate(expression, thread, frame)
+    }
 
     override def evaluate(
         expression: String,
