@@ -1,16 +1,17 @@
 package ch.epfl.scala.debugadapter.internal
 
-import ch.epfl.scala.debugadapter.internal.evaluator.{Evaluator, JdiClassLoader}
+import ch.epfl.scala.debugadapter.internal.evaluator.Evaluator
 import ch.epfl.scala.debugadapter.{DebuggeeRunner, Logger}
-import com.microsoft.java.debug.core.{DebugSettings, IEvaluatableBreakpoint}
 import com.microsoft.java.debug.core.adapter._
 import com.microsoft.java.debug.core.protocol.Types
+import com.microsoft.java.debug.core.{DebugSettings, IEvaluatableBreakpoint}
 import com.sun.jdi._
 import io.reactivex.Observable
 import org.objectweb.asm.{ClassReader, ClassVisitor, Label, MethodVisitor, Opcodes}
 
 import java.net.URI
-import java.nio.file.{Files, Path}
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Path, Paths}
 import java.util
 import java.util.Collections
 import java.util.concurrent.CompletableFuture
@@ -36,73 +37,90 @@ private[debugadapter] object DebugAdapter {
     val context = new ProviderContext
     context.registerProvider(classOf[IHotCodeReplaceProvider], HotCodeReplaceProvider)
     context.registerProvider(classOf[IVirtualMachineManagerProvider], VirtualMachineManagerProvider)
-    context.registerProvider(classOf[ISourceLookUpProvider], new SourceLookUpProvider(runner, logger))
-    context.registerProvider(classOf[IEvaluationProvider], EvaluationProvider)
+    val sourceLookUpProvider = new SourceLookUpProvider(runner, logger)
+    context.registerProvider(classOf[ISourceLookUpProvider], sourceLookUpProvider)
+    context.registerProvider(classOf[IEvaluationProvider], new EvaluationProvider(sourceLookUpProvider))
     context.registerProvider(classOf[ICompletionsProvider], CompletionsProvider)
     context
   }
 
   object CompletionsProvider extends ICompletionsProvider {
     override def codeComplete(
-        frame: StackFrame,
-        snippet: String,
-        line: Int,
-        column: Int
-    ): util.List[Types.CompletionItem] = Collections.emptyList()
+                               frame: StackFrame,
+                               snippet: String,
+                               line: Int,
+                               column: Int
+                             ): util.List[Types.CompletionItem] = Collections.emptyList()
   }
 
-  object EvaluationProvider extends IEvaluationProvider {
+  class EvaluationProvider(sourceLookUpProvider: ISourceLookUpProvider) extends IEvaluationProvider {
     override def isInEvaluation(thread: ThreadReference): Boolean = false
 
     override def evaluate(
-        expression: String,
-        thread: ThreadReference,
-        depth: Int
-    ): CompletableFuture[Value] = {
+                           expression: String,
+                           thread: ThreadReference,
+                           depth: Int
+                         ): CompletableFuture[Value] = {
       val frame = thread.frames().get(depth)
-      Evaluator.evaluate(expression, thread, frame)
+      Evaluator.evaluate(expression, thread, frame)(sourceLookUpProvider)
     }
 
     override def evaluate(
-        expression: String,
-        thisContext: ObjectReference,
-        thread: ThreadReference
-    ): CompletableFuture[Value] = ???
+                           expression: String,
+                           thisContext: ObjectReference,
+                           thread: ThreadReference
+                         ): CompletableFuture[Value] = ???
 
     override def evaluateForBreakpoint(
-        breakpoint: IEvaluatableBreakpoint,
-        thread: ThreadReference
-    ): CompletableFuture[Value] = ???
+                                        breakpoint: IEvaluatableBreakpoint,
+                                        thread: ThreadReference
+                                      ): CompletableFuture[Value] = ???
 
     override def invokeMethod(
-        thisContext: ObjectReference,
-        methodName: String,
-        methodSignature: String,
-        args: Array[Value],
-        thread: ThreadReference,
-        invokeSuper: Boolean
-    ): CompletableFuture[Value] = ???
+                               thisContext: ObjectReference,
+                               methodName: String,
+                               methodSignature: String,
+                               args: Array[Value],
+                               thread: ThreadReference,
+                               invokeSuper: Boolean
+                             ): CompletableFuture[Value] = ???
 
     override def clearState(thread: ThreadReference): Unit = {}
   }
 
   object HotCodeReplaceProvider extends IHotCodeReplaceProvider {
     override def onClassRedefined(consumer: Consumer[util.List[String]]): Unit = ()
+
     override def redefineClasses(): CompletableFuture[util.List[String]] =
       CompletableFuture.completedFuture(Collections.emptyList())
+
     override def getEventHub: Observable[HotCodeReplaceEvent] = Observable.empty()
   }
 
   final class SourceLookUpProvider(runner: DebuggeeRunner, logger: Logger) extends ISourceLookUpProvider {
     override def supportsRealtimeBreakpointVerification(): Boolean = true
+
     override def getSourceFileURI(fqn: String, path: String): String = path
-    override def getSourceContents(uri: String): String = ""
+
+    override def getSourceContents(uri: String): String = {
+//      """object EvaluateTest {
+//        |  def main(args: Array[String]): Unit = {
+//        |    val a: Int = 1
+//        |    val b: Int = 2
+//        |    val c: String = "1 + 2 = "
+//        |    println(c + (a + b))
+//        |  }
+//        |}
+//        |""".stripMargin
+      val uri = new URI("file:///home/tdudzik/work/thesis/scala-test/src/main/scala/Main.scala")
+      new String(Files.readAllBytes(Paths.get(uri)), StandardCharsets.UTF_8)
+    }
 
     override def getFullyQualifiedName(
-        uriRepr: String,
-        lines: Array[Int],
-        columns: Array[Int]
-    ): Array[String] = {
+                                        uriRepr: String,
+                                        lines: Array[Int],
+                                        columns: Array[Int]
+                                      ): Array[String] = {
       val uri = URI.create(uriRepr)
       if (uri.getScheme == "dap-fqcn") {
         val resolvedName = uri.getSchemeSpecificPart
@@ -115,18 +133,18 @@ private[debugadapter] object DebugAdapter {
     }
 
     private def collectLineNumbers(
-        reader: ClassReader,
-        lines: mutable.HashMap[Int, String]
-    ): Unit = {
+                                    reader: ClassReader,
+                                    lines: mutable.HashMap[Int, String]
+                                  ): Unit = {
       val className = reader.getClassName
       val visitor = new ClassVisitor(Opcodes.ASM7) {
         override def visitMethod(
-            access: Int,
-            name: String,
-            desc: String,
-            signature: String,
-            exceptions: Array[String]
-        ): MethodVisitor = {
+                                  access: Int,
+                                  name: String,
+                                  desc: String,
+                                  signature: String,
+                                  exceptions: Array[String]
+                                ): MethodVisitor = {
           new MethodVisitor(Opcodes.ASM7) {
             override def visitLineNumber(line: Int, start: Label): Unit = {
               lines.+=(line -> className)

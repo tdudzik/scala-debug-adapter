@@ -14,7 +14,7 @@ import ch.epfl.scala.debugadapter.testing.TestDebugClient
 import ch.epfl.scala.debugadapter.internal.DebugSession
 
 object DebugServerSpec extends TestSuite {
-  val DefaultTimeout = Duration(2, TimeUnit.SECONDS)
+  val DefaultTimeout = Duration(10, TimeUnit.SECONDS)
   // the server needs only one thread for delayed responses of the launch and configurationDone requests
   val executorService  = Executors.newFixedThreadPool(1)
   implicit val ec = ExecutionContext.fromExecutorService(executorService)
