@@ -46,44 +46,44 @@ private[debugadapter] object DebugAdapter {
 
   object CompletionsProvider extends ICompletionsProvider {
     override def codeComplete(
-                               frame: StackFrame,
-                               snippet: String,
-                               line: Int,
-                               column: Int
-                             ): util.List[Types.CompletionItem] = Collections.emptyList()
+        frame: StackFrame,
+        snippet: String,
+        line: Int,
+        column: Int
+    ): util.List[Types.CompletionItem] = Collections.emptyList()
   }
 
   class EvaluationProvider(sourceLookUpProvider: ISourceLookUpProvider) extends IEvaluationProvider {
     override def isInEvaluation(thread: ThreadReference): Boolean = false
 
     override def evaluate(
-                           expression: String,
-                           thread: ThreadReference,
-                           depth: Int
-                         ): CompletableFuture[Value] = {
+        expression: String,
+        thread: ThreadReference,
+        depth: Int
+    ): CompletableFuture[Value] = {
       val frame = thread.frames().get(depth)
       Evaluator.evaluate(expression, thread, frame)(sourceLookUpProvider)
     }
 
     override def evaluate(
-                           expression: String,
-                           thisContext: ObjectReference,
-                           thread: ThreadReference
-                         ): CompletableFuture[Value] = ???
+        expression: String,
+        thisContext: ObjectReference,
+        thread: ThreadReference
+    ): CompletableFuture[Value] = ???
 
     override def evaluateForBreakpoint(
-                                        breakpoint: IEvaluatableBreakpoint,
-                                        thread: ThreadReference
-                                      ): CompletableFuture[Value] = ???
+        breakpoint: IEvaluatableBreakpoint,
+        thread: ThreadReference
+    ): CompletableFuture[Value] = ???
 
     override def invokeMethod(
-                               thisContext: ObjectReference,
-                               methodName: String,
-                               methodSignature: String,
-                               args: Array[Value],
-                               thread: ThreadReference,
-                               invokeSuper: Boolean
-                             ): CompletableFuture[Value] = ???
+        thisContext: ObjectReference,
+        methodName: String,
+        methodSignature: String,
+        args: Array[Value],
+        thread: ThreadReference,
+        invokeSuper: Boolean
+    ): CompletableFuture[Value] = ???
 
     override def clearState(thread: ThreadReference): Unit = {}
   }
@@ -112,15 +112,15 @@ private[debugadapter] object DebugAdapter {
 //        |  }
 //        |}
 //        |""".stripMargin
-      val uri = new URI("file:///home/tdudzik/work/thesis/scala-test/src/main/scala/Main.scala")
+      val uri = new URI("path")
       new String(Files.readAllBytes(Paths.get(uri)), StandardCharsets.UTF_8)
     }
 
     override def getFullyQualifiedName(
-                                        uriRepr: String,
-                                        lines: Array[Int],
-                                        columns: Array[Int]
-                                      ): Array[String] = {
+        uriRepr: String,
+        lines: Array[Int],
+        columns: Array[Int]
+    ): Array[String] = {
       val uri = URI.create(uriRepr)
       if (uri.getScheme == "dap-fqcn") {
         val resolvedName = uri.getSchemeSpecificPart
@@ -133,9 +133,9 @@ private[debugadapter] object DebugAdapter {
     }
 
     private def collectLineNumbers(
-                                    reader: ClassReader,
-                                    lines: mutable.HashMap[Int, String]
-                                  ): Unit = {
+        reader: ClassReader,
+        lines: mutable.HashMap[Int, String]
+    ): Unit = {
       val className = reader.getClassName
       val visitor = new ClassVisitor(Opcodes.ASM7) {
         override def visitMethod(
