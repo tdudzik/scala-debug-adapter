@@ -46,21 +46,21 @@ private[debugadapter] object DebugAdapter {
 
   object CompletionsProvider extends ICompletionsProvider {
     override def codeComplete(
-                               frame: StackFrame,
-                               snippet: String,
-                               line: Int,
-                               column: Int
-                             ): util.List[Types.CompletionItem] = Collections.emptyList()
+      frame: StackFrame,
+      snippet: String,
+      line: Int,
+      column: Int
+    ): util.List[Types.CompletionItem] = Collections.emptyList()
   }
 
   class EvaluationProvider(sourceLookUpProvider: ISourceLookUpProvider) extends IEvaluationProvider {
     override def isInEvaluation(thread: ThreadReference): Boolean = false
 
     override def evaluate(
-                           expression: String,
-                           thread: ThreadReference,
-                           depth: Int
-                         ): CompletableFuture[Value] = {
+      expression: String,
+      thread: ThreadReference,
+      depth: Int
+    ): CompletableFuture[Value] = {
       val frame = thread.frames().get(depth)
       Evaluator.evaluate(expression, thread, frame)(sourceLookUpProvider)
     }
@@ -124,18 +124,18 @@ private[debugadapter] object DebugAdapter {
     }
 
     private def collectLineNumbers(
-                                    reader: ClassReader,
-                                    lines: mutable.HashMap[Int, String]
-                                  ): Unit = {
+        reader: ClassReader,
+        lines: mutable.HashMap[Int, String]
+    ): Unit = {
       val className = reader.getClassName
       val visitor = new ClassVisitor(Opcodes.ASM7) {
         override def visitMethod(
-                                  access: Int,
-                                  name: String,
-                                  desc: String,
-                                  signature: String,
-                                  exceptions: Array[String]
-                                ): MethodVisitor = {
+            access: Int,
+            name: String,
+            desc: String,
+            signature: String,
+            exceptions: Array[String]
+        ): MethodVisitor = {
           new MethodVisitor(Opcodes.ASM7) {
             override def visitLineNumber(line: Int, start: Label): Unit = {
               lines.+=(line -> className)
