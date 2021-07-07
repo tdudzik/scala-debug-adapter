@@ -1,22 +1,17 @@
 package ch.epfl.scala.debugadapter
 
-import com.microsoft.java.debug.core.protocol.Events.OutputEvent.Category
+import ch.epfl.scala.debugadapter.testing.TestDebugClient
 import sbt.io.IO
 import utest._
 
-
-import java.net.{ConnectException, SocketException, SocketTimeoutException}
-import java.util.concurrent.{Executors, TimeUnit, TimeoutException}
-import scala.concurrent.{Await, ExecutionContext}
+import java.util.concurrent.{Executors, TimeUnit}
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-
-import ch.epfl.scala.debugadapter.testing.TestDebugClient
-import ch.epfl.scala.debugadapter.internal.DebugSession
 
 object DebugServerSpec extends TestSuite {
   val DefaultTimeout = Duration(10, TimeUnit.SECONDS)
   // the server needs only one thread for delayed responses of the launch and configurationDone requests
-  val executorService  = Executors.newFixedThreadPool(1)
+  val executorService = Executors.newFixedThreadPool(1)
   implicit val ec = ExecutionContext.fromExecutorService(executorService)
 
   def tests: Tests = Tests {
@@ -42,7 +37,12 @@ object DebugServerSpec extends TestSuite {
         val stackTrace = client.stackTrace(threadId)
         val topFrame = stackTrace.stackFrames.head
 
+        println(client.evaluate("a", topFrame.id))
         println(client.evaluate("b", topFrame.id))
+        println(client.evaluate("c", topFrame.id))
+        println(client.evaluate("args", topFrame.id))
+        println(client.evaluate("y", topFrame.id))
+        println(client.evaluate("z", topFrame.id))
 
         client.continue(threadId)
         client.exited
