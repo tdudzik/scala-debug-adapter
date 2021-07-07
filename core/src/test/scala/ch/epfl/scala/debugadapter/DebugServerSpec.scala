@@ -1,25 +1,60 @@
 package ch.epfl.scala.debugadapter
 
-import com.microsoft.java.debug.core.protocol.Events.OutputEvent.Category
+import ch.epfl.scala.debugadapter.testing.TestDebugClient
 import sbt.io.IO
 import utest._
 
-
-import java.net.{ConnectException, SocketException, SocketTimeoutException}
-import java.util.concurrent.{Executors, TimeUnit, TimeoutException}
-import scala.concurrent.{Await, ExecutionContext}
+import java.util.concurrent.{Executors, TimeUnit}
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-import ch.epfl.scala.debugadapter.testing.TestDebugClient
-import ch.epfl.scala.debugadapter.internal.DebugSession
-
 object DebugServerSpec extends TestSuite {
-  val DefaultTimeout = Duration(2, TimeUnit.SECONDS)
+  val DefaultTimeout = Duration(10, TimeUnit.SECONDS)
   // the server needs only one thread for delayed responses of the launch and configurationDone requests
-  val executorService  = Executors.newFixedThreadPool(1)
+  val executorService = Executors.newFixedThreadPool(1)
   implicit val ec = ExecutionContext.fromExecutorService(executorService)
 
   def tests: Tests = Tests {
+    "should evaluate scala expression" - {
+      val tempDir = IO.createTemporaryDirectory
+      val runner = MainDebuggeeRunner.evaluateTest(tempDir)
+      val server = DebugServer(runner, NoopLogger)
+      val client = TestDebugClient.connect(server.uri)
+      try {
+        server.connect()
+        client.initialize()
+        client.launch()
+
+        val breakpoints = client.setBreakpoints(runner.source, Array(15))
+        assert(breakpoints.length == 1)
+        assert(breakpoints.forall(_.verified))
+        client.configurationDone()
+
+        val stopped = client.stopped
+        val threadId = stopped.threadId
+        assert(stopped.reason == "breakpoint")
+
+        val stackTrace = client.stackTrace(threadId)
+        val topFrame = stackTrace.stackFrames.head
+
+        println(client.evaluate("a", topFrame.id))
+        println(client.evaluate("b", topFrame.id))
+        println(client.evaluate("c", topFrame.id))
+        println(client.evaluate("args", topFrame.id))
+        println(client.evaluate("y", topFrame.id))
+        println(client.evaluate("z", topFrame.id))
+
+        client.continue(threadId)
+        client.exited
+        client.terminated
+      } finally {
+        server.close()
+        client.close()
+        IO.delete(tempDir)
+      }
+    }
+
+    /*
     "should prevent connection when closed" - {
       val runner = new MockDebuggeeRunner()
       val server = DebugServer(runner, NoopLogger, gracePeriod = Duration.Zero)
@@ -470,5 +505,6 @@ object DebugServerSpec extends TestSuite {
         client1.close()
       }
     }
+     */
   }
 }
